@@ -2,12 +2,9 @@ import Flutter
 import UIKit
 
 public class RestartPlugin: NSObject, FlutterPlugin {
-    
-    // 🔑 FIX: Changed the callback name and signature. It now accepts the 
-    // FlutterPluginRegistry (which FlutterEngine implements), allowing 
-    // the AppDelegate to correctly register plugins with the new engine.
-    @objc public static var pluginRegisterFunction: (FlutterPluginRegistry) -> Void = { registry in
-        NSLog("WARNING: pluginRegisterFunction is not assigned by the AppDelegate. Restarting will likely fail to load plugins.")
+    // CHANGE 1: Update callback to accept a FlutterPluginRegistry
+    @objc public static var generatedPluginRegistrantRegisterCallback: (FlutterPluginRegistry) -> Void = { _ in
+        NSLog("WARNING: generatedPluginRegistrantRegisterCallback is not assigned by the AppDelegate.")
     }
     
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -22,10 +19,8 @@ public class RestartPlugin: NSObject, FlutterPlugin {
         case "restart":
             let args = arguments?["args"] as? [String]
             
-            // Create a brand new engine instance.
-            let engine = FlutterEngine(name: "io.flutter.flutter.app.newEngine")
-            
-            // Run the new engine.
+            // 1. Create the new engine
+            let engine = FlutterEngine(name: "io.flutter.flutter.app")
             engine.run(
                 withEntrypoint: nil,
                 libraryURI: nil,
@@ -33,20 +28,16 @@ public class RestartPlugin: NSObject, FlutterPlugin {
                 entrypointArgs: args
             )
             
-            // Set the new engine's view controller as the root.
-            let flutterViewController = FlutterViewController(
+            // 2. CHANGE 2: Pass the NEW engine to the callback
+            // This ensures plugins are registered on THIS engine, not the old one.
+            RestartPlugin.generatedPluginRegistrantRegisterCallback(engine)
+            
+            // 3. Set the UI
+            UIApplication.shared.keyWindow?.rootViewController = FlutterViewController(
                 engine: engine,
                 nibName: nil,
                 bundle: nil
             )
-            UIApplication.shared.keyWindow?.rootViewController = flutterViewController
-
-            // 🔑 CRITICAL FIX: Call the registration function (assigned in AppDelegate)
-            // passing the NEW engine as the registry. This must be done asynchronously
-            // to give the engine time to fully initialize.
-            DispatchQueue.main.async {
-                RestartPlugin.pluginRegisterFunction(engine)
-            }
             
             result(nil)
         default:
